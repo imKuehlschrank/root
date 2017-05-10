@@ -7,6 +7,7 @@
 #include <TRootEmbeddedCanvas.h>
 #include <RQ_OBJECT.h>
 
+
 //OnTrack__TID__PLUS__ring__
 
 using namespace std;
@@ -54,16 +55,21 @@ private:
     TFile*      file;
     TDirectory* baseDir;
 
+    TGLabel* currdirLabel;
+
     TCanvas* previewCanvas;
     TCanvas* resultCanvas;
 
     map<Int_t, HistogramInfo> table;
     map<Int_t, HistogramInfo> selection;
 
+    TGFileDialog* loadDialog;
+
     Int_t freeId = 0;
     Int_t GetNextFreeId() { return freeId++; }
 
     bool display_full_path = false;
+    void InitAll();
 };
 
 
@@ -77,6 +83,11 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     TGHorizontalFrame* mainFrame = new TGHorizontalFrame(fMain, 200, 20);
     TGHorizontalFrame* selectFrame = new TGHorizontalFrame(fMain, 200, 40);
 
+    currdirLabel = new TGLabel(fMain,"");
+    fMain->AddFrame(currdirLabel, new TGLayoutHints(kLHintsCenterX ,2,2,2,2));
+    currdirLabel->MoveResize(0,0,500,16);
+
+
     // "Quicksearch" group frame
     TGGroupFrame *quicksearchFrame = new TGGroupFrame(fMain,"Quicksearch");
     quicksearchFrame->SetLayoutBroken(kTRUE);
@@ -89,12 +100,12 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     searchBox->MoveResize(120,16,300,20);
 
     TGLabel *substrLabel = new TGLabel(quicksearchFrame,"Enter Substring:");
-    quicksearchFrame->AddFrame(substrLabel, new TGLayoutHints(kLHintsExpandX ,2,2,2,2));
-    substrLabel->MoveResize(8,18,104,16);
+    quicksearchFrame->AddFrame(substrLabel, new TGLayoutHints(kLHintsLeft ,2,2,2,2));
+    substrLabel->MoveResize(8,18,100,16);
 
     TGCheckButton *displayPathCheckBox = new TGCheckButton(quicksearchFrame,"Display path");
     quicksearchFrame->AddFrame(displayPathCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsTop,2,2,2,2));
-    displayPathCheckBox->MoveResize(8,40,160,17);
+    displayPathCheckBox->MoveResize(8,40,100,17);
 
     quicksearchFrame->SetLayoutManager(new TGVerticalLayout(quicksearchFrame));
     quicksearchFrame->Resize(608,72);
@@ -129,21 +140,8 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
 
     // Map main frame
     fMain->MapWindow();
-
-    file = TFile::Open("/home/fil/projects/PR/root/GuiPlotTool/DQM_V0001_SiStrip_R000283283.root");
-
-    string baseDir_str = "DQMData/Run 283283/SiStrip/Run summary/MechanicalView";
-    baseDir = (TDirectory *)file->Get(baseDir_str.c_str());
-
-    if (baseDir == nullptr) {
-        cout << "Error while opening File " << endl;
-    }
-
-    cout << table.size() << endl;
-    LoadAllPlotsFromDir(baseDir);
-    DisplayMapInListBox(table, mainListBox);
-    cout << table.size() << endl;
     fMain->MoveResize(200, 300, 450, 600);
+    InitAll();
 }
 
 MyMainFrame::~MyMainFrame() {
@@ -151,10 +149,35 @@ MyMainFrame::~MyMainFrame() {
     delete fMain;
 }
 
+void MyMainFrame::InitAll(){
+    TGFileInfo file_info_;
+    const char *filetypes[] = {"ROOT files", "*.root", 0, 0};
+    file_info_.fFileTypes = filetypes;
+    new TGFileDialog(gClient->GetDefaultRoot(), fMain, kFDOpen, &file_info_);
+
+    file = TFile::Open(file_info_.fFilename);
+
+    // string baseDirStr = "DQMData/Run 283283/SiStrip/Run summary/MechanicalView";
+    string baseDirStr = "DQMData";
+    baseDir = (TDirectory *)file->Get(baseDirStr.c_str());
+
+    if (baseDir == nullptr) {
+        cout << "Error while opening File " << endl;
+    }
+
+    string currentPath = string(file_info_.fFilename) + ":/" + string(baseDirStr);
+    currdirLabel->SetText(currentPath.c_str());
+
+    LoadAllPlotsFromDir(baseDir);
+    DisplayMapInListBox(table, mainListBox);
+    fMain->MoveResize(200, 300, 450, 600);
+}
+
 void MyMainFrame::Toggle_path_display() {
     display_full_path = !display_full_path;
     DisplayMapInListBox(table, mainListBox);
     DisplayMapInListBox(selection, selectionListBox);
+    FilterBySearchBox();
 }
 
 void MyMainFrame::LoadAllPlotsFromDir(TDirectory *current) {
