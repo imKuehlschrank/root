@@ -7,7 +7,23 @@
 #include <TRootEmbeddedCanvas.h>
 #include <RQ_OBJECT.h>
 
+//OnTrack__TID__PLUS__ring__
+
 using namespace std;
+
+class HistogramInfo {
+public:
+    HistogramInfo(TObject* o, string p, string n) : obj(o), filePath(p), name(n) {}
+
+    TObject* GetObj()  const { return obj; }
+    string   GetPath() const { return filePath; }
+    string   GetName() const { return name; }
+
+private:
+    TObject* obj;
+    string filePath;
+    string name;
+};
 
 class MyMainFrame {
     RQ_OBJECT("MyMainFrame")
@@ -17,25 +33,23 @@ public:
     virtual ~MyMainFrame();
 
     void LoadAllPlotsFromDir(TDirectory *src);
-    void DisplayMapInListBox(const map<string, TObject *> &m, TGListBox *listbox);
+    void DisplayMapInListBox(const map<Int_t, HistogramInfo> &m, TGListBox *listbox);
     void FilterBySearchBox();
 
     void RemoveFromSelection();
     void AddToSelection();
 
     void PreviewSelection();
-    void PreviewSelectedItem();
     void Superimpose();
 
     void Clear();
-    void testfunction();
+    void Toggle_path_display();
 
 private:
     TGMainFrame* fMain;
     TGTextEntry* searchBox;
     TGListBox*   mainListBox;
     TGListBox*   selectionListBox;
-//    TGLabel*     topDirectoryIndicator;
 
     TFile*      file;
     TDirectory* baseDir;
@@ -43,35 +57,49 @@ private:
     TCanvas* previewCanvas;
     TCanvas* resultCanvas;
 
-    map<string, TObject *> table;
-    map<string, TObject *> selection;
+    map<Int_t, HistogramInfo> table;
+    map<Int_t, HistogramInfo> selection;
 
+    Int_t freeId = 0;
+    Int_t GetNextFreeId() { return freeId++; }
+
+    bool display_full_path = false;
 };
 
 
 MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     fMain = new TGMainFrame(p, w, h);
 
-//    topDirectoryIndicator = new TGLabel(fMain);
     mainListBox = new TGListBox(fMain, -1, kSunkenFrame);
     selectionListBox = new TGListBox(fMain, -1, kSunkenFrame);
-    searchBox = new TGTextEntry(fMain);
+    //    searchBox = new TGTextEntry(fMain);
 
-    searchBox->Connect("TextChanged(const char *)", "MyMainFrame", this, "FilterBySearchBox()");
-    mainListBox->Connect("DoubleClicked(Int_t, Int_t)", "MyMainFrame", this, "AddToSelection()");
-    selectionListBox->Connect("DoubleClicked(Int_t, Int_t)", "MyMainFrame", this, "RemoveFromSelection()");
-
-//    TGHorizontalFrame* searchFrame = new TGHorizontalFrame(fMain, 200, 20);
     TGHorizontalFrame* mainFrame = new TGHorizontalFrame(fMain, 200, 20);
     TGHorizontalFrame* selectFrame = new TGHorizontalFrame(fMain, 200, 40);
 
+    // "Quicksearch" group frame
+    TGGroupFrame *quicksearchFrame = new TGGroupFrame(fMain,"Quicksearch");
+    quicksearchFrame->SetLayoutBroken(kTRUE);
 
-    // --- top frame
-    TGTextButton* previewSelected = new TGTextButton(mainFrame, "&Preview Item");
-    previewSelected->Connect("Clicked()", "MyMainFrame", this, "PreviewSelectedItem()");
-    mainFrame->AddFrame(previewSelected, new TGLayoutHints(kLHintsCenterX, 4, 4, 3, 4));
+    searchBox = new TGTextEntry(quicksearchFrame);
+    searchBox->SetAlignment(kTextLeft);
+    searchBox->SetText("");
 
-    // --- lower buttons
+    quicksearchFrame->AddFrame(searchBox, new TGLayoutHints(kLHintsLeft | kLHintsTop | kLHintsExpandX ,2,2,2,2));
+    searchBox->MoveResize(120,16,300,20);
+
+    TGLabel *substrLabel = new TGLabel(quicksearchFrame,"Enter Substring:");
+    quicksearchFrame->AddFrame(substrLabel, new TGLayoutHints(kLHintsExpandX ,2,2,2,2));
+    substrLabel->MoveResize(8,18,104,16);
+
+    TGCheckButton *displayPathCheckBox = new TGCheckButton(quicksearchFrame,"Display path");
+    quicksearchFrame->AddFrame(displayPathCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsTop,2,2,2,2));
+    displayPathCheckBox->MoveResize(8,40,160,17);
+
+    quicksearchFrame->SetLayoutManager(new TGVerticalLayout(quicksearchFrame));
+    quicksearchFrame->Resize(608,72);
+
+    // botom part
     TGTextButton* draw = new TGTextButton(selectFrame, "&Preview Selection List");
     draw->Connect("Clicked()", "MyMainFrame", this, "PreviewSelection()");
     selectFrame->AddFrame(draw, new TGLayoutHints(kLHintsCenterX, 5, 5, 3, 4));
@@ -80,26 +108,24 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     superimpose->Connect("Clicked()", "MyMainFrame", this, "Superimpose()");
     selectFrame->AddFrame(superimpose, new TGLayoutHints(kLHintsCenterX, 5, 5, 3, 4));
 
-    TGTextButton* clear = new TGTextButton(selectFrame, "&Clear All");
+    TGTextButton* clear = new TGTextButton(selectFrame, "&Clear Selection");
     clear->Connect("Clicked()", "MyMainFrame", this, "Clear()");
     selectFrame->AddFrame(clear, new TGLayoutHints(kLHintsCenterX, 5, 5, 3, 4));
 
-    fMain->AddFrame(searchBox, new TGLayoutHints(kLHintsExpandX, 5, 5, 5, 6));
     fMain->AddFrame(mainFrame, new TGLayoutHints(kLHintsCenterX, 2, 2, 2, 2));
 
+    fMain->AddFrame(quicksearchFrame, new TGLayoutHints(kLHintsLeft | kLHintsTop | kLHintsExpandX,2,2,2,2));
     fMain->AddFrame(mainListBox, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 5, 6));
     fMain->AddFrame(selectionListBox, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 6, 7));
     fMain->AddFrame(selectFrame, new TGLayoutHints(kLHintsCenterX, 2, 2, 2, 2));
 
     fMain->SetWindowName("Filter & Combine Plots");
     fMain->MapSubwindows();
-    mainListBox->Resize(200, 300);
-    mainListBox->MoveResize(250, 80, 150, 250);
 
-    selectionListBox->Resize(200, 300);
-    selectionListBox->MoveResize(250, 280, 150, 300);
-
-    fMain->MoveResize(200, 300, 500, 600);
+    searchBox->Connect("TextChanged(const char *)", "MyMainFrame", this, "FilterBySearchBox()");
+    mainListBox->Connect("DoubleClicked(Int_t)", "MyMainFrame", this, "AddToSelection()");
+    selectionListBox->Connect("DoubleClicked(Int_t)", "MyMainFrame", this, "RemoveFromSelection()");
+    displayPathCheckBox->Connect("Clicked()", "MyMainFrame", this, "Toggle_path_display()");
 
     // Map main frame
     fMain->MapWindow();
@@ -113,10 +139,11 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
         cout << "Error while opening File " << endl;
     }
 
+    cout << table.size() << endl;
     LoadAllPlotsFromDir(baseDir);
     DisplayMapInListBox(table, mainListBox);
-
-    fMain->MoveResize(200, 300, 1200, 600);
+    cout << table.size() << endl;
+    fMain->MoveResize(200, 300, 450, 600);
 }
 
 MyMainFrame::~MyMainFrame() {
@@ -124,11 +151,11 @@ MyMainFrame::~MyMainFrame() {
     delete fMain;
 }
 
-void MyMainFrame::testfunction() {
-
-cout << "Holy shit " << endl;
+void MyMainFrame::Toggle_path_display() {
+    display_full_path = !display_full_path;
+    DisplayMapInListBox(table, mainListBox);
+    DisplayMapInListBox(selection, selectionListBox);
 }
-
 
 void MyMainFrame::LoadAllPlotsFromDir(TDirectory *current) {
     TIter next(current->GetListOfKeys());
@@ -146,28 +173,38 @@ void MyMainFrame::LoadAllPlotsFromDir(TDirectory *current) {
             TH1 *h = (TH1 *)key->ReadObj();
             string fname = h->GetName();
             string path = string(current->GetPath()) + "/" + fname;
-            table.insert(pair<string, TObject *>(path, h));
+
+            Int_t key_entry = GetNextFreeId();
+            HistogramInfo value_entry(h, path, fname);
+
+            table.insert(make_pair(key_entry, value_entry));
         }
     }
 }
 
-void MyMainFrame::DisplayMapInListBox(const map<string, TObject *> &m, TGListBox *listbox) {
+void MyMainFrame::DisplayMapInListBox(const map<Int_t, HistogramInfo> &m, TGListBox *listbox) {
     listbox->RemoveAll();
+
     for (auto &elem : m) {
-        listbox->AddEntry(elem.first.c_str(), listbox->GetNumberOfEntries());
+        if(display_full_path)
+            listbox->AddEntry(elem.second.GetPath().c_str(), elem.first);
+        else
+            listbox->AddEntry(elem.second.GetName().c_str(), elem.first);
     }
+
     listbox->SortByName();
 }
 
 void MyMainFrame::AddToSelection() {
-    string key = mainListBox->GetSelectedEntry()->GetTitle();
-    TObject *val = table.find(key)->second;
-    selection.insert(pair<string, TObject *>(key, val));
+    Int_t key = mainListBox->GetSelected();
+    HistogramInfo val = table.find(key)->second;
+
+    selection.insert(make_pair(key, val));
     DisplayMapInListBox(selection, selectionListBox);
 }
 
 void MyMainFrame::RemoveFromSelection() {
-    string key = selectionListBox->GetSelectedEntry()->GetTitle();
+    Int_t key = selectionListBox->GetSelected();
     selection.erase(key);
     DisplayMapInListBox(selection, selectionListBox);
 }
@@ -179,13 +216,14 @@ void MyMainFrame::Clear() {
 
 void MyMainFrame::FilterBySearchBox() {
     mainListBox->RemoveAll();
-    map<string, TObject *> tmp_filtered;
+
+    map<Int_t, HistogramInfo> tmp_filtered;
+
     string seach_text = searchBox->GetText();
 
     for (auto &elem : table) {
-        if (elem.first.find(seach_text) != string::npos) {
-            string key = elem.first;
-            TObject *val = elem.second;
+        string fullname = elem.second.GetPath();
+        if (fullname.find(seach_text) != string::npos) {
             tmp_filtered.insert(elem);
         }
     }
@@ -199,17 +237,8 @@ void MyMainFrame::PreviewSelection() {
     Int_t i = 1;
     for (auto &elem : selection) {
         previewCanvas->cd(i++);
-        elem.second->Draw();
+        elem.second.GetObj()->Draw();
     }
-}
-
-void MyMainFrame::PreviewSelectedItem() {
-    previewCanvas = new TCanvas("Preview Canvas", "", 800, 400);
-    string key = mainListBox->GetSelectedEntry()->GetTitle();
-    TObject *val = table.find(key)->second;
-
-    previewCanvas->cd();
-    val->Draw();
 }
 
 void MyMainFrame::Superimpose() {
@@ -217,8 +246,8 @@ void MyMainFrame::Superimpose() {
     resultCanvas->cd();
 
     for(auto& elem : selection){
-        ((TH1*)elem.second)->SetStats(false);
-        elem.second->Draw("same");
+        ((TH1*)elem.second.GetObj())->SetStats(false);
+        elem.second.GetObj()->Draw("same");
     }
 }
 
