@@ -52,8 +52,6 @@ public:
 
     void ToggleEnableRenameTextbox();
     void UpdateDistplayListboxes();
-
-
     void HandleMenu(Int_t a);
 
 private:
@@ -72,8 +70,7 @@ private:
     TGCheckButton* displayPathCheckBox;
     TGCheckButton* renameCheckbox;
     TGCheckButton* statsCheckBox;
-    TGCheckButton* tdrCheckBox;
-
+    TGCheckButton* tdrstyleCheckBox;
 
     TCanvas* previewCanvas;
     TCanvas* resultCanvas;
@@ -91,7 +88,9 @@ private:
     Int_t freeId = 0;
     Int_t GetNextFreeId() { return freeId++; }
 
+    void ResetGuiElements();
     void InitAll();
+
 };
 
 
@@ -107,9 +106,7 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     fMenuFile->AddEntry(" &Open...\tCtrl+O", M_FILE_OPEN, 0, gClient->GetPicture("bld_open.png"));
     fMenuFile->AddSeparator();
     fMenuFile->AddEntry(" E&xit\tCtrl+Q", M_FILE_EXIT, 0, gClient->GetPicture("bld_exit.png"));
-    fMenuFile->Connect("Activated(Int_t)", "MyMainFrame", this, "HandleMenu(Int_t)");
     fMenuBar->AddPopup("&File", fMenuFile, new TGLayoutHints(kLHintsLeft, 0, 4, 0, 0));
-
 
     // ---- Top label
     currdirLabel = new TGLabel(fMain,"");
@@ -125,8 +122,14 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     quicksearchFrame->AddFrame(displayPathCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsTop,2,2,2,2));
 
     // ---- Listboxes
-    mainListBox = new TGListBox(fMain, -1, kSunkenFrame);
-    selectionListBox = new TGListBox(fMain, -1, kSunkenFrame);
+    TGVerticalFrame* listboxesFrame = new TGVerticalFrame(fMain, 200, 40);
+
+    mainListBox = new TGListBox(listboxesFrame, -1, kSunkenFrame);
+    selectionListBox = new TGListBox(listboxesFrame, -1, kSunkenFrame);
+
+    listboxesFrame->AddFrame(mainListBox,      new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 3, 4));
+    listboxesFrame->AddFrame(selectionListBox, new TGLayoutHints(kLHintsExpandX , 5, 5, 3, 4));
+    selectionListBox->Resize(100,200);
 
     // --- All Controls
     TGHorizontalFrame* controlFrame = new TGHorizontalFrame(fMain, 200, 40);
@@ -145,12 +148,12 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
         // ------- Checkboxes
     TGVerticalFrame* controlFrameCheckboxes = new TGVerticalFrame(controlFrame, 200, 80);
 
-    tdrCheckBox   = new TGCheckButton(controlFrameCheckboxes, "Pub. Style");
-    statsCheckBox = new TGCheckButton(controlFrameCheckboxes, "Show Stats");
+    tdrstyleCheckBox = new TGCheckButton(controlFrameCheckboxes, "Pub. Style");
+    statsCheckBox    = new TGCheckButton(controlFrameCheckboxes, "Show Stats");
     TGCheckButton* cb1 = new TGCheckButton(controlFrameCheckboxes,"Use Colors");
     TGCheckButton* cb2 = new TGCheckButton(controlFrameCheckboxes,"Add Legend ");
 
-    controlFrameCheckboxes->AddFrame(tdrCheckBox,   new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameCheckboxes->AddFrame(tdrstyleCheckBox,   new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     controlFrameCheckboxes->AddFrame(statsCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     controlFrameCheckboxes->AddFrame(cb1, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     controlFrameCheckboxes->AddFrame(cb2, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
@@ -170,19 +173,19 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     controlFrame->AddFrame(controlFrameRename,     new TGLayoutHints(kLHintsCenterX, 2, 2, 2, 2));
 
     // ---- Main Frame, Adding all the individual frames in the appropriate order top to bottom
-
     fMain->AddFrame(fMenuBar,           new TGLayoutHints(kLHintsLeft ,2,2,2,2));
     fMain->AddFrame(quicksearchFrame,   new TGLayoutHints(kLHintsLeft | kLHintsTop | kLHintsExpandX,2,2,2,2));
     fMain->AddFrame(currdirLabel,       new TGLayoutHints(kLHintsLeft | kLHintsExpandX ,2,2,2,2));
-    fMain->AddFrame(mainListBox,        new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 5, 6));
-    fMain->AddFrame(selectionListBox,   new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 5, 6));
+    fMain->AddFrame(listboxesFrame,     new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 5, 6));
     fMain->AddFrame(controlFrame,       new TGLayoutHints(kLHintsLeft, 2, 2, 2, 2));
 
     fMain->SetWindowName("Filter & Combine Plots");
     fMain->MapSubwindows();
 
-
     // #### Signal/Slots ####
+
+    fMenuFile->Connect("Activated(Int_t)", "MyMainFrame", this, "HandleMenu(Int_t)");
+
     searchBox->Connect("TextChanged(const char *)", "MyMainFrame", this, "FilterBySearchBox()");
     displayPathCheckBox->Connect("Clicked()", "MyMainFrame", this, "UpdateDistplayListboxes()");
 
@@ -196,8 +199,11 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     renameCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleEnableRenameTextbox()");
 
     // #### Init Window ####
+
     fMain->MapWindow();
     fMain->MoveResize(100, 100, 600, 700);
+
+    ResetGuiElements();
 }
 
 MyMainFrame::~MyMainFrame() {
@@ -219,7 +225,6 @@ void MyMainFrame::HandleMenu(Int_t menu_id)
     }
 }
 
-
 string MyMainFrame::LoadFileFromDialog()
 {
     TGFileInfo file_info_;
@@ -230,16 +235,24 @@ string MyMainFrame::LoadFileFromDialog()
     return file_info_.fFilename;
 }
 
-
 void MyMainFrame::ToggleEnableRenameTextbox() {
     renameTextbox->SetEnabled(renameCheckbox->IsDown());
 }
 
+void MyMainFrame::ResetGuiElements() {
+    currdirLabel->SetText("");
+    searchBox->SetText("");
+    renameTextbox->SetEnabled(false);
+
+    displayPathCheckBox->SetState(kButtonUp);
+    statsCheckBox->SetState(kButtonUp);
+    tdrstyleCheckBox->SetState(kButtonUp);
+}
 
 void MyMainFrame::InitAll() {
+//    ResetGuiElements(); // TODO: What is the behaviour that we want??
 
     string file_name = LoadFileFromDialog();
-//    string file_name = "/home/fil/projects/PR/root/GuiPlotTool/DQM_V0001_SiStrip_R000283283.root";
     file = TFile::Open(file_name.c_str());
 
     file ?  cout << "[ OK ]" : cout << "[FAIL]";
@@ -252,11 +265,7 @@ void MyMainFrame::InitAll() {
     cout << " Entering Directory" << endl;
 
     string currentPath = file_name + ":/" + string(baseDirStr);
-
-    // Set up all the GUI elements
     currdirLabel->SetText(currentPath.c_str());
-    searchBox->SetText("");
-    renameTextbox->SetEnabled(false);
 
     // Fill internal data structes from file and display
     LoadAllPlotsFromDir(baseDir);
@@ -342,7 +351,7 @@ void MyMainFrame::PreviewSelection() {
     previewCanvas->Divide(selection.size(), 1);
 
     Int_t i = 1;
-    for (auto &elem : selection) {
+    for (auto& elem : selection) {
         previewCanvas->cd(i++);
         elem.second.GetObj()->Draw();
     }
