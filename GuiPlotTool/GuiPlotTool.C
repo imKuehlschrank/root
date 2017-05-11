@@ -12,6 +12,11 @@
 
 using namespace std;
 
+enum EMyMessageTypes {
+   M_FILE_OPEN,
+   M_FILE_EXIT
+};
+
 class HistogramInfo {
 public:
     HistogramInfo(TObject* o, string p) : obj(o), filePath(p) {}
@@ -48,8 +53,14 @@ public:
     void ToggleEnableRenameTextbox();
     void UpdateDistplayListboxes();
 
+
+    void HandleMenu(Int_t a);
+
 private:
     // GUI elements
+    TGMenuBar* fMenuBar;
+    TGPopupMenu* fMenuFile;
+
     TGMainFrame* fMain;
     TGLabel*     currdirLabel;
     TGTextEntry* searchBox;
@@ -88,6 +99,18 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     fMain = new TGMainFrame(p, w, h);
 
     // #### DESIGN ####
+
+    // ---- Menu Bar
+    fMenuBar = new TGMenuBar(fMain, 35, 50, kHorizontalFrame);
+
+    fMenuFile = new TGPopupMenu(gClient->GetRoot());
+    fMenuFile->AddEntry(" &Open...\tCtrl+O", M_FILE_OPEN, 0, gClient->GetPicture("bld_open.png"));
+    fMenuFile->AddSeparator();
+    fMenuFile->AddEntry(" E&xit\tCtrl+Q", M_FILE_EXIT, 0, gClient->GetPicture("bld_exit.png"));
+    fMenuFile->Connect("Activated(Int_t)", "MyMainFrame", this, "HandleMenu(Int_t)");
+    fMenuBar->AddPopup("&File", fMenuFile, new TGLayoutHints(kLHintsLeft, 0, 4, 0, 0));
+
+
     // ---- Top label
     currdirLabel = new TGLabel(fMain,"");
     currdirLabel->MoveResize(0,0,500,16);
@@ -97,9 +120,6 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
 
     searchBox = new TGTextEntry(quicksearchFrame);
     displayPathCheckBox = new TGCheckButton(quicksearchFrame,"Display path");
-
-    searchBox->MoveResize(120,16,300,20);
-    displayPathCheckBox->MoveResize(8,40,100,17);
 
     quicksearchFrame->AddFrame(searchBox,           new TGLayoutHints(kLHintsExpandX ,2,2,2,2));
     quicksearchFrame->AddFrame(displayPathCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsTop,2,2,2,2));
@@ -125,12 +145,12 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
         // ------- Checkboxes
     TGVerticalFrame* controlFrameCheckboxes = new TGVerticalFrame(controlFrame, 200, 80);
 
-    tdrCheckBox = new TGCheckButton(controlFrameCheckboxes,"Pub. Style");
-    statsCheckBox = new TGCheckButton(controlFrameCheckboxes,"Show Stats");
+    tdrCheckBox   = new TGCheckButton(controlFrameCheckboxes, "Pub. Style");
+    statsCheckBox = new TGCheckButton(controlFrameCheckboxes, "Show Stats");
     TGCheckButton* cb1 = new TGCheckButton(controlFrameCheckboxes,"Use Colors");
     TGCheckButton* cb2 = new TGCheckButton(controlFrameCheckboxes,"Add Legend ");
 
-    controlFrameCheckboxes->AddFrame(tdrCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameCheckboxes->AddFrame(tdrCheckBox,   new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     controlFrameCheckboxes->AddFrame(statsCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     controlFrameCheckboxes->AddFrame(cb1, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     controlFrameCheckboxes->AddFrame(cb2, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
@@ -150,10 +170,12 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     controlFrame->AddFrame(controlFrameRename,     new TGLayoutHints(kLHintsCenterX, 2, 2, 2, 2));
 
     // ---- Main Frame, Adding all the individual frames in the appropriate order top to bottom
-    fMain->AddFrame(currdirLabel,       new TGLayoutHints(kLHintsCenterX ,2,2,2,2));
+
+    fMain->AddFrame(fMenuBar,           new TGLayoutHints(kLHintsLeft ,2,2,2,2));
     fMain->AddFrame(quicksearchFrame,   new TGLayoutHints(kLHintsLeft | kLHintsTop | kLHintsExpandX,2,2,2,2));
+    fMain->AddFrame(currdirLabel,       new TGLayoutHints(kLHintsLeft | kLHintsExpandX ,2,2,2,2));
     fMain->AddFrame(mainListBox,        new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 5, 6));
-    fMain->AddFrame(selectionListBox,   new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 6, 7));
+    fMain->AddFrame(selectionListBox,   new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 5, 6));
     fMain->AddFrame(controlFrame,       new TGLayoutHints(kLHintsLeft, 2, 2, 2, 2));
 
     fMain->SetWindowName("Filter & Combine Plots");
@@ -176,13 +198,27 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     // #### Init Window ####
     fMain->MapWindow();
     fMain->MoveResize(100, 100, 600, 700);
-    InitAll();
 }
 
 MyMainFrame::~MyMainFrame() {
     fMain->Cleanup();
     delete fMain;
 }
+
+void MyMainFrame::HandleMenu(Int_t menu_id)
+{
+    switch (menu_id) {
+    case M_FILE_OPEN:
+        cout << "[ OK ] Open File Dialog" << endl;
+        InitAll();
+        break;
+
+    case M_FILE_EXIT:
+        gApplication->Terminate(0);
+        break;
+    }
+}
+
 
 string MyMainFrame::LoadFileFromDialog()
 {
@@ -225,7 +261,6 @@ void MyMainFrame::InitAll() {
     // Fill internal data structes from file and display
     LoadAllPlotsFromDir(baseDir);
     DisplayMapInListBox(table, mainListBox);
-    fMain->MoveResize(100, 100, 600, 700);
 }
 
 void MyMainFrame::UpdateDistplayListboxes() {
