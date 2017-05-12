@@ -75,18 +75,21 @@ private:
     TGTextEntry* searchBox;
     TGTextEntry* renameTextbox;
 
-    TGNumberEntryField* ymaxNumbertextbox;
+    TGNumberEntryField* xminNumbertextbox;
     TGNumberEntryField* xmaxNumbertextbox;
+    TGNumberEntryField* yminNumbertextbox;
+    TGNumberEntryField* ymaxNumbertextbox;
 
     TGListBox*   mainListBox;
     TGListBox*   selectionListBox;
 
     TGCheckButton* displayPathCheckBox;
-    TGCheckButton* statsCheckBox;
     TGCheckButton* tdrstyleCheckBox;
+    TGCheckButton* statsCheckBox;
+    TGCheckButton* mergeOnTopCheckBox;
     TGCheckButton* renameCheckbox;
-    TGCheckButton* xmaxCheckbox;
-    TGCheckButton* ymaxCheckbox;
+    TGCheckButton* xRangeCheckbox;
+    TGCheckButton* yRangeCheckbox;
 
     TCanvas* previewCanvas = nullptr;
     TCanvas* resultCanvas = nullptr;
@@ -137,14 +140,22 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     // ---- Listboxes
     TGVerticalFrame* listboxesFrame = new TGVerticalFrame(fMain, 200, 40);
 
-    mainListBox      = new TGListBox(listboxesFrame, -1, kSunkenFrame);
-    selectionListBox = new TGListBox(listboxesFrame, -1, kSunkenFrame);
-    TGHorizontal3DLine* listboxseperatorLine = new TGHorizontal3DLine(listboxesFrame);
+    TGHorizontalFrame* mainListboxFrame = new TGHorizontalFrame(listboxesFrame, 10, 250, kFixedHeight);
+    TGHorizontalFrame* selectionListboxFrame = new TGHorizontalFrame(listboxesFrame);
 
-    listboxesFrame->AddFrame(mainListBox,          new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 5, 5, 3, 4));
-    listboxesFrame->AddFrame(listboxseperatorLine, new TGLayoutHints(kLHintsExpandX, 5, 5, 3, 4));
-    listboxesFrame->AddFrame(selectionListBox,     new TGLayoutHints(kLHintsExpandX , 5, 5, 3, 4));
-    selectionListBox->Resize(100,140);
+    mainListBox      = new TGListBox(mainListboxFrame, -1, kSunkenFrame);
+    selectionListBox = new TGListBox(selectionListboxFrame, -1, kSunkenFrame);
+
+    mainListboxFrame->AddFrame(mainListBox,          new TGLayoutHints(kLHintsExpandX | kLHintsExpandY));
+    selectionListboxFrame->AddFrame(selectionListBox,new TGLayoutHints(kLHintsExpandX | kLHintsExpandY));
+
+    TGHSplitter *hsplitter = new TGHSplitter(listboxesFrame,2,2);
+    hsplitter->SetFrame(mainListboxFrame, kTRUE);
+
+    listboxesFrame->AddFrame(mainListboxFrame,      new TGLayoutHints(kLHintsExpandX, 5, 5, 3, 4));
+    listboxesFrame->AddFrame(hsplitter,             new TGLayoutHints(kLHintsTop | kLHintsExpandX));
+    listboxesFrame->AddFrame(selectionListboxFrame, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY , 5, 5, 3, 4));
+
 
     // --- All Controls
     TGHorizontalFrame* controlFrame = new TGHorizontalFrame(fMain, 200, 40);
@@ -161,44 +172,64 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
         // ------- Checkboxes
     TGVerticalFrame* controlFrameCheckboxes = new TGVerticalFrame(controlFrame, 200, 80);
 
-    tdrstyleCheckBox = new TGCheckButton(controlFrameCheckboxes, "Pub. Style");
-    statsCheckBox    = new TGCheckButton(controlFrameCheckboxes, "Show Stats");
+    tdrstyleCheckBox   = new TGCheckButton(controlFrameCheckboxes, "Pub. Style");
+    statsCheckBox      = new TGCheckButton(controlFrameCheckboxes, "Show Stats");
+    mergeOnTopCheckBox = new TGCheckButton(controlFrameCheckboxes, "Add Superimposed");
 
     controlFrameCheckboxes->AddFrame(tdrstyleCheckBox,   new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
-    controlFrameCheckboxes->AddFrame(statsCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameCheckboxes->AddFrame(statsCheckBox,      new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameCheckboxes->AddFrame(mergeOnTopCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
 
         // ------- Output Buttons
     TGVerticalFrame* outputControlFrameButtons = new TGVerticalFrame(controlFrame, 200, 40);
 
-    TGTextButton* mergeSelectionButton = new TGTextButton(outputControlFrameButtons, "&Merge");
-    TGTextButton* superimposeButton    = new TGTextButton(outputControlFrameButtons, "&Superimpose");
+    TGTextButton* mergeSelectionButton    = new TGTextButton(outputControlFrameButtons, "&Merge Only");
+    TGTextButton* superimposeButton       = new TGTextButton(outputControlFrameButtons, "&Superimpose");
     TGVertical3DLine* outputseperatorLine = new TGVertical3DLine(controlFrame);
 
     outputControlFrameButtons->AddFrame(mergeSelectionButton, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     outputControlFrameButtons->AddFrame(superimposeButton,    new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
 
         // ------- Custom
-    TGVerticalFrame* controlFrameRename = new TGVerticalFrame(controlFrame, 200, 40);
+    TGVerticalFrame* controlFrameCustom = new TGVerticalFrame(controlFrame, 200, 40);
 
-    renameCheckbox = new TGCheckButton(controlFrameRename,"Use Custom Title");
-    renameTextbox  = new TGTextEntry(controlFrameRename);
+    renameCheckbox = new TGCheckButton(controlFrameCustom,"Use Custom Title");
+    renameTextbox  = new TGTextEntry(controlFrameCustom);
 
-    xmaxCheckbox      = new TGCheckButton(controlFrameRename,"Use Custom XMax");
-    ymaxCheckbox      = new TGCheckButton(controlFrameRename,"Use Custom YMax");
-    xmaxNumbertextbox = new TGNumberEntryField(controlFrameRename);
-    ymaxNumbertextbox = new TGNumberEntryField(controlFrameRename);
+            // X Axis
+    TGHorizontalFrame* controlFrameXRange = new TGHorizontalFrame(controlFrameCustom, 200, 40);
 
-    controlFrameRename->AddFrame(renameCheckbox,    new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
-    controlFrameRename->AddFrame(renameTextbox,     new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
-    controlFrameRename->AddFrame(xmaxCheckbox,      new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
-    controlFrameRename->AddFrame(xmaxNumbertextbox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
-    controlFrameRename->AddFrame(ymaxCheckbox,      new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
-    controlFrameRename->AddFrame(ymaxNumbertextbox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    xRangeCheckbox    = new TGCheckButton(controlFrameCustom,"Use Custom X Range");
+    xminNumbertextbox = new TGNumberEntryField(controlFrameXRange);
+    xmaxNumbertextbox = new TGNumberEntryField(controlFrameXRange);
+
+    controlFrameXRange->AddFrame(xminNumbertextbox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameXRange->AddFrame(xmaxNumbertextbox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+
+            // Y Axis
+    TGHorizontalFrame* controlFrameYRange = new TGHorizontalFrame(controlFrameCustom, 200, 40);
+
+    yRangeCheckbox    = new TGCheckButton(controlFrameCustom,"Use Custom Y Range");
+    yminNumbertextbox = new TGNumberEntryField(controlFrameYRange);
+    ymaxNumbertextbox = new TGNumberEntryField(controlFrameYRange);
+
+    controlFrameYRange->AddFrame(yminNumbertextbox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameYRange->AddFrame(ymaxNumbertextbox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+
+        // ------- Add to Custom
+    controlFrameCustom->AddFrame(renameCheckbox,     new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameCustom->AddFrame(renameTextbox,      new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+
+    controlFrameCustom->AddFrame(xRangeCheckbox,     new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameCustom->AddFrame(controlFrameXRange, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+
+    controlFrameCustom->AddFrame(yRangeCheckbox,     new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameCustom->AddFrame(controlFrameYRange, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
 
         // --- Add to All Controls
     controlFrame->AddFrame(selectionControlFrameButtons, new TGLayoutHints(kLHintsCenterX, 2, 2, 2, 2));
     controlFrame->AddFrame(controlFrameCheckboxes,       new TGLayoutHints(kLHintsCenterX, 2, 2, 2, 2));
-    controlFrame->AddFrame(controlFrameRename,           new TGLayoutHints(kLHintsCenterX, 2, 2, 2, 2));
+    controlFrame->AddFrame(controlFrameCustom,           new TGLayoutHints(kLHintsCenterX, 2, 2, 2, 2));
     controlFrame->AddFrame(outputseperatorLine,          new TGLayoutHints(kLHintsExpandY, 2, 2, 2, 2));
     controlFrame->AddFrame(outputControlFrameButtons,    new TGLayoutHints(kLHintsCenterX, 2, 2, 2, 2));
 
@@ -228,17 +259,14 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     mergeSelectionButton->Connect("Clicked()", "MyMainFrame", this, "MergeSelection()");
 
     renameCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleEnableRenameTextbox()");
-    xmaxCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleXMaxTextbox()");
-    ymaxCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleYMaxTextbox()");
+    xRangeCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleXMaxTextbox()");
+    yRangeCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleYMaxTextbox()");
 
     // #### Init Window ####
 
     fMain->MapWindow();
     fMain->MoveResize(100, 100, 600, 700);
-
     ResetGuiElements();
-//    InitAll();
-//    searchBox->SetText("OnTrack__TID__PLUS__ring__");
 }
 
 MyMainFrame::~MyMainFrame() {
@@ -275,20 +303,22 @@ void MyMainFrame::ToggleEnableRenameTextbox() {
 }
 
 void MyMainFrame::ToggleXMaxTextbox() {
-    xmaxNumbertextbox->SetEnabled(xmaxCheckbox->IsDown());
+    xminNumbertextbox->SetEnabled(xRangeCheckbox->IsDown());
+    xmaxNumbertextbox->SetEnabled(xRangeCheckbox->IsDown());
 }
 
 void MyMainFrame::ToggleYMaxTextbox() {
-    ymaxNumbertextbox->SetEnabled(ymaxCheckbox->IsDown());
+    yminNumbertextbox->SetEnabled(yRangeCheckbox->IsDown());
+    ymaxNumbertextbox->SetEnabled(yRangeCheckbox->IsDown());
 }
 
 void MyMainFrame::ResetGuiElements() {
     currdirLabel->SetText("");
     searchBox->SetText("");
-    xmaxNumbertextbox->SetText("");
-    ymaxNumbertextbox->SetText("");
     renameTextbox->SetEnabled(false);
+    xminNumbertextbox->SetEnabled(false);
     xmaxNumbertextbox->SetEnabled(false);
+    yminNumbertextbox->SetEnabled(false);
     ymaxNumbertextbox->SetEnabled(false);
 
     displayPathCheckBox->SetState(kButtonUp);
@@ -405,9 +435,7 @@ void MyMainFrame::PreviewSelection() {
     }
 }
 
-// superimpoes that uses only Draw("SAME")
 void MyMainFrame::Superimpose() {
-
     if(selection.size() == 0) {
         return;
     }
@@ -456,19 +484,18 @@ void MyMainFrame::Superimpose() {
 
     // draw all the things
     resultCanvas->cd();
-    Int_t colors[7] = {4, 8, 2, 1, 7, 33, 40}; //fixme...
+    Int_t colors[7] = {4, 8, 2, 1, 7, 33, 40}; //FIXME only supporting 7 colors...
 
     Int_t idx = 0;
     for(auto& elem : copies) {
         elem->SetLineColor(colors[idx]);
 
-        if(xmaxCheckbox->IsOn()) {
-            elem->SetAxisRange(0., xmaxNumbertextbox->GetNumber(),"X");
+        if(xRangeCheckbox->IsOn()) {
+            elem->SetAxisRange(xminNumbertextbox->GetNumber(), xmaxNumbertextbox->GetNumber(),"X");
         }
 
-        if(ymaxCheckbox->IsOn()) {
-            elem->SetMinimum(0);
-            elem->SetMaximum(ymaxNumbertextbox->GetNumber());
+        if(yRangeCheckbox->IsOn()) {
+            elem->SetAxisRange(yminNumbertextbox->GetNumber(), ymaxNumbertextbox->GetNumber(),"Y");
         }
 
         if(renameCheckbox->IsOn()) {
@@ -515,13 +542,12 @@ void MyMainFrame::MergeSelection() {
         copies[0]->Add(copies[idx]);
     }
 
-    if(xmaxCheckbox->IsOn()) {
-        copies[0]->SetAxisRange(0., xmaxNumbertextbox->GetNumber(),"X");
+    if(xRangeCheckbox->IsOn()) {
+        copies[0]->SetAxisRange(xminNumbertextbox->GetNumber(), xmaxNumbertextbox->GetNumber(),"X");
     }
 
-    if(ymaxCheckbox->IsOn()) {
-        copies[0]->SetMinimum(0);
-        copies[0]->SetMaximum(ymaxNumbertextbox->GetNumber());
+    if(yRangeCheckbox->IsOn()) {
+        copies[0]->SetAxisRange(yminNumbertextbox->GetNumber(), ymaxNumbertextbox->GetNumber(),"Y");
     }
 
     if(renameCheckbox->IsOn()) {
