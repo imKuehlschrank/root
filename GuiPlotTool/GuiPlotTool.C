@@ -55,6 +55,7 @@ public:
     string LoadFileFromDialog();
 
     void ToggleEnableRenameTextbox();
+    void ToggleXMaxTextbox();
     void ToggleYMaxTextbox();
 
     void UpdateDistplayListboxes();
@@ -73,19 +74,22 @@ private:
 
     TGTextEntry* searchBox;
     TGTextEntry* renameTextbox;
+
     TGNumberEntryField* ymaxNumbertextbox;
+    TGNumberEntryField* xmaxNumbertextbox;
 
     TGListBox*   mainListBox;
     TGListBox*   selectionListBox;
 
     TGCheckButton* displayPathCheckBox;
-    TGCheckButton* renameCheckbox;
-    TGCheckButton* ymaxCheckbox;
     TGCheckButton* statsCheckBox;
     TGCheckButton* tdrstyleCheckBox;
+    TGCheckButton* renameCheckbox;
+    TGCheckButton* xmaxCheckbox;
+    TGCheckButton* ymaxCheckbox;
 
-    TCanvas* previewCanvas;
-    TCanvas* resultCanvas;
+    TCanvas* previewCanvas = nullptr;
+    TCanvas* resultCanvas = nullptr;
 
     // File Stuff
     TFile*      file;
@@ -179,11 +183,15 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     renameCheckbox = new TGCheckButton(controlFrameRename,"Use Custom Title");
     renameTextbox  = new TGTextEntry(controlFrameRename);
 
+    xmaxCheckbox      = new TGCheckButton(controlFrameRename,"Use Custom XMax");
     ymaxCheckbox      = new TGCheckButton(controlFrameRename,"Use Custom YMax");
+    xmaxNumbertextbox = new TGNumberEntryField(controlFrameRename);
     ymaxNumbertextbox = new TGNumberEntryField(controlFrameRename);
 
     controlFrameRename->AddFrame(renameCheckbox,    new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     controlFrameRename->AddFrame(renameTextbox,     new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameRename->AddFrame(xmaxCheckbox,      new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameRename->AddFrame(xmaxNumbertextbox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     controlFrameRename->AddFrame(ymaxCheckbox,      new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
     controlFrameRename->AddFrame(ymaxNumbertextbox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
 
@@ -220,6 +228,7 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     mergeSelectionButton->Connect("Clicked()", "MyMainFrame", this, "MergeSelection()");
 
     renameCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleEnableRenameTextbox()");
+    xmaxCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleXMaxTextbox()");
     ymaxCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleYMaxTextbox()");
 
     // #### Init Window ####
@@ -228,8 +237,8 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     fMain->MoveResize(100, 100, 600, 700);
 
     ResetGuiElements();
-    InitAll();
-    searchBox->SetText("InPi");
+//    InitAll();
+//    searchBox->SetText("OnTrack__TID__PLUS__ring__");
 }
 
 MyMainFrame::~MyMainFrame() {
@@ -265,6 +274,10 @@ void MyMainFrame::ToggleEnableRenameTextbox() {
     renameTextbox->SetEnabled(renameCheckbox->IsDown());
 }
 
+void MyMainFrame::ToggleXMaxTextbox() {
+    xmaxNumbertextbox->SetEnabled(xmaxCheckbox->IsDown());
+}
+
 void MyMainFrame::ToggleYMaxTextbox() {
     ymaxNumbertextbox->SetEnabled(ymaxCheckbox->IsDown());
 }
@@ -272,8 +285,10 @@ void MyMainFrame::ToggleYMaxTextbox() {
 void MyMainFrame::ResetGuiElements() {
     currdirLabel->SetText("");
     searchBox->SetText("");
+    xmaxNumbertextbox->SetText("");
     ymaxNumbertextbox->SetText("");
     renameTextbox->SetEnabled(false);
+    xmaxNumbertextbox->SetEnabled(false);
     ymaxNumbertextbox->SetEnabled(false);
 
     displayPathCheckBox->SetState(kButtonUp);
@@ -282,10 +297,10 @@ void MyMainFrame::ResetGuiElements() {
 }
 
 void MyMainFrame::InitAll() {
-    ResetGuiElements(); // TODO: What is the behaviour that we want??
+//    ResetGuiElements();
 
-//    string file_name = LoadFileFromDialog(); // FIXME put back
-    string file_name = "/home/fil/projects/PR/root/GuiPlotTool/DQM_V0001_SiStrip_R000283283.root";
+    string file_name = LoadFileFromDialog();
+//    string file_name = "/home/fil/projects/PR/root/GuiPlotTool/DQM_V0001_SiStrip_R000283283.root";
     file = TFile::Open(file_name.c_str());
 
     file ?  cout << "[ OK ]" : cout << "[FAIL]";
@@ -392,122 +407,130 @@ void MyMainFrame::PreviewSelection() {
 
 // superimpoes that uses only Draw("SAME")
 void MyMainFrame::Superimpose() {
+
+    if(selection.size() == 0) {
+        return;
+    }
+
     resultCanvas = new TCanvas("Superimpose Canvas", "", 800, 400);
     resultCanvas->cd();
 
-    bool firstElem = true;
-    string title;
-    TH1* out;
+    // never work on the originals!
+    vector<TH1*> copies;
     for(auto& elem : selection){
+        copies.push_back((TH1*)elem.second.GetObj()->Clone());
+    }
 
-        if(firstElem){
-            out = (TH1*)elem.second.GetObj()->Clone();
+    // collect the statboxes
+    vector<TPaveStats*> statboxes;
+    TPaveStats* tstat;
+    double X1, Y1, X2, Y2;
+
+    TCanvas* tmpCanvas = new TCanvas("a Canvas", "", 800, 400);
+    tmpCanvas->cd();
+
+    for(int i=0; i<copies.size(); i++) {
+
+        copies[i]->SetLineColor(kRed);
+        copies[i]->Draw();
+        gPad->Update();
+
+        tstat = (TPaveStats*) copies[i]->FindObject("stats");
+
+        if(i!=0){
+            tstat->SetX1NDC(X1);
+            tstat->SetX2NDC(X2);
+            tstat->SetY1NDC(Y1-(Y2-Y1));
+            tstat->SetY2NDC(Y1);
+        }
+
+        X1 = tstat->GetX1NDC();
+        Y1 = tstat->GetY1NDC();
+        X2 = tstat->GetX2NDC();
+        Y2 = tstat->GetY2NDC();
+
+        statboxes.push_back(tstat);
+    }
+    delete tmpCanvas;
 
 
-            if(ymaxCheckbox->IsOn()) {
-                out->SetMaximum(ymaxNumbertextbox->GetNumber());
-            }
+    // draw all the things
+    resultCanvas->cd();
+    Int_t colors[7] = {4, 8, 2, 1, 7, 33, 40}; //fixme...
 
-            if(renameCheckbox->IsOn()) {
-                string tmp = renameTextbox->GetText();
-                out->SetTitle(tmp.c_str());
-            }
+    Int_t idx = 0;
+    for(auto& elem : copies) {
+        elem->SetLineColor(colors[idx]);
 
-            out->SetStats(statsCheckBox->IsOn());  // FIXME: only shows the first statbox
-            out->Draw("same");
-            firstElem=false;
+        if(xmaxCheckbox->IsOn()) {
+            elem->SetAxisRange(0., xmaxNumbertextbox->GetNumber(),"X");
+        }
 
-        } else {
-            ((TH1*)elem.second.GetObj())->SetStats(statsCheckBox->IsOn()); // FIXME: only shows the first statbox
+        if(ymaxCheckbox->IsOn()) {
+            elem->SetMinimum(0);
+            elem->SetMaximum(ymaxNumbertextbox->GetNumber());
+        }
 
-            int randNum = rand()%(40-0 + 1);
+        if(renameCheckbox->IsOn()) {
+            string tmp = renameTextbox->GetText();
+            elem->SetTitle(tmp.c_str());
+        }
 
-            ((TH1*)elem.second.GetObj())->SetLineColor(randNum);
-            elem.second.GetObj()->Draw("same");
+        elem->SetStats(statsCheckBox->IsOn());
 
+        elem->Draw("same");
+        idx++;
+    }
+
+    if(statsCheckBox->IsOn()) {
+        idx = 0;
+        for(auto& elem : statboxes) {
+            elem->SetTextColor(colors[idx]);
+            elem->SetLineColor(colors[idx]);
+            elem->Draw("same");
+
+            idx++;
         }
     }
 }
 
-//void MyMainFrame::Superimpose() {
-//    TCanvas* c1 = new TCanvas("Superimpose Canvas", "", 800, 400);
-
-//    bool firstElem = true;
-//    TH1 *h1;
-//    TH1 *h2;
-
-
-//    TPad *pad1 = new TPad("pad1","",0,0,1,1);
-//    TPad *pad2 = new TPad("pad2","",0,0,1,1);
-
-//    pad2->SetFillStyle(4000); //will be transparent
-
-
-//    for(auto& elem : selection){
-
-//        if(firstElem){
-//            h1 = (TH1*)elem.second.GetObj();
-//            firstElem=false;
-
-//        } else {
-//            h2 = (TH1*)elem.second.GetObj();
-//        }
-//    }
-
-
-//    h1->Draw();
-//    pad1->Update(); //this will force the generation of the "stats" box
-//    TPaveStats *ps1 = (TPaveStats*)h1->GetListOfFunctions()->FindObject("stats");
-//    ps1->SetX1NDC(0.4); ps1->SetX2NDC(0.6);
-//    pad1->Modified();
-//    c1->cd();
-
-
-//    h1->SetMaximum(4000.);   // along
-//    h2->SetMaximum(4000.);   // along
-
-
-
-//    Double_t ymin = 0;
-//    Double_t ymax = 2000;
-//    Double_t dy = (ymax-ymin)/0.8; //10 per cent margins top and bottom
-//    Double_t xmin = -3;
-//    Double_t xmax = 3;
-//    Double_t dx = (xmax-xmin)/0.8; //10 per cent margins left and right
-//    pad2->Range(xmin-0.1*dx,ymin-0.1*dy,xmax+0.1*dx,ymax+0.1*dy);
-//    pad2->Draw();
-//    pad2->cd();
-//    h2->SetLineColor(kRed);
-//    h2->Draw("same");
-//    pad2->Update();
-//    TPaveStats *ps2 = (TPaveStats*)h2->GetListOfFunctions()->FindObject("stats");
-//    ps2->SetX1NDC(0.65); ps2->SetX2NDC(0.85);
-//    ps2->SetTextColor(kRed);
-//}
-
-
 void MyMainFrame::MergeSelection() {
+
+    if(selection.size() == 0) {
+        return;
+    }
+
     resultCanvas = new TCanvas("Merge Canvas", "", 800, 400);
     resultCanvas->cd();
 
-    bool firstElem = true;
-    string title;
-    TH1* out;
-
-    for(auto& elem : selection) {
-
-        if(firstElem) {
-            out = (TH1*)elem.second.GetObj()->Clone();
-
-            (renameCheckbox->IsOn()) ? title=renameTextbox->GetText() : title=out->GetTitle();
-            out->SetTitle(title.c_str());
-
-            firstElem = false;
-        } else {
-            out->Add((TH1*)elem.second.GetObj());
-        }
+    // work on copy
+    vector<TH1*> copies;
+    for(auto& elem : selection){
+        copies.push_back((TH1*)elem.second.GetObj()->Clone());
     }
-    out->Draw();
+
+    // set options
+
+    for(Int_t idx=1; idx<copies.size(); ++idx) {
+        copies[0]->Add(copies[idx]);
+    }
+
+    if(xmaxCheckbox->IsOn()) {
+        copies[0]->SetAxisRange(0., xmaxNumbertextbox->GetNumber(),"X");
+    }
+
+    if(ymaxCheckbox->IsOn()) {
+        copies[0]->SetMinimum(0);
+        copies[0]->SetMaximum(ymaxNumbertextbox->GetNumber());
+    }
+
+    if(renameCheckbox->IsOn()) {
+        string tmp = renameTextbox->GetText();
+        copies[0]->SetTitle(tmp.c_str());
+    }
+
+    copies[0]->SetStats(statsCheckBox->IsOn());
+    copies[0]->Draw();
 }
 
 
