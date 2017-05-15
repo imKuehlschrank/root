@@ -447,7 +447,6 @@ void MyMainFrame::CalcSuperimpose(vector<TH1*>& plots, vector<TPaveStats*>& stat
 
     for(int i=0; i<plots.size(); i++) {
 
-        plots[i]->SetLineColor(kRed);
         plots[i]->Draw();
         gPad->Update();
 
@@ -490,9 +489,17 @@ void MyMainFrame::SetCheckboxOptions(TH1* elem) {
 
 void MyMainFrame::DrawPlots(vector<TH1*>& plots, vector<TPaveStats*>& statboxes, string option="") {
 
-    resultCanvas->cd();
-    Int_t colors[7] = {4, 8, 2, 1, 7, 33, 40}; //FIXME only supporting 7 colors...
+    vector<Int_t> basic_colors = { kBlue, kGreen, kCyan, kMagenta, kRed };
+    vector<Int_t> colors;
 
+    // why god why... https://root.cern.ch/doc/master/classTColor.html
+    for(auto c : basic_colors) colors.push_back(c);
+    for(auto c : basic_colors) colors.push_back(c+2);
+    for(auto c : basic_colors) colors.push_back(c-7);
+    for(auto c : basic_colors) colors.push_back(c-4);
+    for(auto c : basic_colors) colors.push_back(c-9);
+
+    resultCanvas->cd();
     Int_t idx = 0;
     for(auto& elem : plots) {
         elem->SetLineColor(colors[idx]);
