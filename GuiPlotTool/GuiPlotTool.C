@@ -57,11 +57,13 @@ public:
     void ToggleEnableRenameTextbox();
     void ToggleXMaxTextbox();
     void ToggleYMaxTextbox();
+    void ToggleTDRStyle();
+
 
     void UpdateDistplayListboxes();
     void HandleMenu(Int_t a);
 
-    void setTDRStyle();
+    void SetPublicationStyle(TStyle* style);
 
     void SetCheckboxOptions(TH1* elem);
     void CalcSuperimpose(vector<TH1*>& plots, vector<TPaveStats*>& statboxes);
@@ -111,7 +113,6 @@ private:
     void ResetGuiElements();
     void InitAll();
 };
-
 
 MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     fMain = new TGMainFrame(p, w, h);
@@ -262,11 +263,12 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
     renameCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleEnableRenameTextbox()");
     xRangeCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleXMaxTextbox()");
     yRangeCheckbox->Connect("Clicked()", "MyMainFrame", this, "ToggleYMaxTextbox()");
+    tdrstyleCheckBox->Connect("Clicked()", "MyMainFrame", this, "ToggleTDRStyle()");
 
     // #### Init Window ####
 
     fMain->MapWindow();
-    fMain->MoveResize(100, 100, 600, 700);
+    fMain->MoveResize(100, 100, 520, 700);
     ResetGuiElements();
 }
 
@@ -275,8 +277,7 @@ MyMainFrame::~MyMainFrame() {
     delete fMain;
 }
 
-void MyMainFrame::HandleMenu(Int_t menu_id)
-{
+void MyMainFrame::HandleMenu(Int_t menu_id) {
     switch (menu_id) {
     case M_FILE_OPEN:
         cout << "[ OK ] Open File Dialog" << endl;
@@ -289,8 +290,7 @@ void MyMainFrame::HandleMenu(Int_t menu_id)
     }
 }
 
-string MyMainFrame::LoadFileFromDialog()
-{
+string MyMainFrame::LoadFileFromDialog() {
     TGFileInfo file_info_;
     const char *filetypes[] = {"ROOT files", "*.root", 0, 0};
     file_info_.fFileTypes = filetypes;
@@ -328,8 +328,7 @@ void MyMainFrame::ResetGuiElements() {
 }
 
 void MyMainFrame::InitAll() {
-//    ResetGuiElements();
-
+    ResetGuiElements();
     string file_name = LoadFileFromDialog();
 //    string file_name = "/home/fil/projects/PR/root/GuiPlotTool/DQM_V0001_SiStrip_R000283283.root";
     file = TFile::Open(file_name.c_str());
@@ -438,7 +437,6 @@ void MyMainFrame::PreviewSelection() {
 
 // statboxes : OUT param
 void MyMainFrame::CalcSuperimpose(vector<TH1*>& plots, vector<TPaveStats*>& statboxes) {
-    // collect the statboxes
     TPaveStats* tstat;
     double X1, Y1, X2, Y2;
 
@@ -564,6 +562,90 @@ void MyMainFrame::MergeSelection() {
     copies[0]->Draw();
 }
 
+
+void MyMainFrame::ToggleTDRStyle() {
+    TStyle* style;
+
+    if(tdrstyleCheckBox->IsOn()){
+        style = new TStyle("tdrStyle","Style for P-TDR");
+        SetPublicationStyle(style);
+    } else{
+        style = new TStyle("Modern","");
+    }
+    style->cd();
+}
+
+
+void MyMainFrame::SetPublicationStyle(TStyle* style) {
+    style->SetCanvasBorderMode(0);
+    style->SetCanvasColor(kWhite);
+    style->SetCanvasDefX(0);
+    style->SetCanvasDefY(0);
+    style->SetPadBorderMode(0);
+    style->SetPadColor(kWhite);
+    style->SetPadGridX(false);
+    style->SetPadGridY(false);
+    style->SetGridColor(0);
+    style->SetGridStyle(3);
+    style->SetGridWidth(1);
+    style->SetFrameBorderMode(0);
+    style->SetFrameBorderSize(1);
+    style->SetFrameFillColor(0);
+    style->SetFrameFillStyle(0);
+    style->SetFrameLineColor(1);
+    style->SetFrameLineStyle(1);
+    style->SetFrameLineWidth(1);
+    style->SetHistLineColor(1);
+    style->SetHistLineStyle(0);
+    style->SetHistLineWidth(1);
+    style->SetErrorX(0.);
+    style->SetMarkerStyle(21);
+    style->SetMarkerSize(.5);
+    style->SetOptFit(1);
+    style->SetFitFormat("5.4g");
+    style->SetFuncColor(2);
+    style->SetFuncStyle(1);
+    style->SetFuncWidth(1);
+    style->SetOptDate(0);
+    style->SetOptFile(0);
+    style->SetOptStat("mr");
+    style->SetStatColor(kWhite);
+    style->SetStatFont(42);
+    style->SetStatFontSize(0.025);
+    style->SetStatTextColor(1);
+    style->SetStatFormat("6.4g");
+    style->SetStatBorderSize(1);
+    style->SetStatH(0.1);
+    style->SetStatW(0.15);
+    style->SetPadTopMargin(0.05);
+    style->SetPadBottomMargin(0.13);
+    style->SetPadLeftMargin(0.13);
+    style->SetPadRightMargin(0.05);
+    style->SetOptTitle(1);
+    style->SetTitleFont(42);
+    style->SetTitleColor(1);
+    style->SetTitleTextColor(1);
+    style->SetTitleFillColor(10);
+    style->SetTitleFontSize(0.045);
+    style->SetTitleColor(1, "XYZ");
+    style->SetTitleFont(42, "XYZ");
+    style->SetTitleSize(0.06, "XYZ");
+    style->SetTitleXOffset(0.9);
+    style->SetTitleYOffset(1.05);
+    style->SetLabelColor(1, "XYZ");
+    style->SetLabelFont(42, "XYZ");
+    style->SetLabelOffset(0.007, "XYZ");
+    style->SetLabelSize(0.05, "XYZ");
+    style->SetAxisColor(1, "XYZ");
+    style->SetStripDecimals(kTRUE);
+    style->SetTickLength(0.03, "XYZ");
+    style->SetNdivisions(510, "XYZ");
+    style->SetPadTickX(1);
+    style->SetPadTickY(1);
+    style->SetOptLogx(0);
+    style->SetOptLogy(0);
+    style->SetOptLogz(0);
+}
 
 
 void GuiPlotTool() {
