@@ -63,6 +63,10 @@ public:
 
     void setTDRStyle();
 
+    void SetCheckboxOptions(TH1* elem);
+    void CalcSuperimpose(vector<TH1*>& plots, vector<TPaveStats*>& statboxes);
+    void DrawPlots(vector<TH1*>& plots, vector<TPaveStats*>& statboxes, string option="");
+
 private:
     // GUI elements
     TGMenuBar*    fMenuBar;
@@ -86,7 +90,6 @@ private:
     TGCheckButton* displayPathCheckBox;
     TGCheckButton* tdrstyleCheckBox;
     TGCheckButton* statsCheckBox;
-    TGCheckButton* mergeOnTopCheckBox;
     TGCheckButton* renameCheckbox;
     TGCheckButton* xRangeCheckbox;
     TGCheckButton* yRangeCheckbox;
@@ -172,13 +175,11 @@ MyMainFrame::MyMainFrame(const TGWindow *p, UInt_t w, UInt_t h) {
         // ------- Checkboxes
     TGVerticalFrame* controlFrameCheckboxes = new TGVerticalFrame(controlFrame, 200, 80);
 
-    tdrstyleCheckBox   = new TGCheckButton(controlFrameCheckboxes, "Pub. Style");
-    statsCheckBox      = new TGCheckButton(controlFrameCheckboxes, "Show Stats");
-    mergeOnTopCheckBox = new TGCheckButton(controlFrameCheckboxes, "Add Superimposed");
+    tdrstyleCheckBox = new TGCheckButton(controlFrameCheckboxes, "Pub. Style");
+    statsCheckBox    = new TGCheckButton(controlFrameCheckboxes, "Show Stats");
 
-    controlFrameCheckboxes->AddFrame(tdrstyleCheckBox,   new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
-    controlFrameCheckboxes->AddFrame(statsCheckBox,      new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
-    controlFrameCheckboxes->AddFrame(mergeOnTopCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameCheckboxes->AddFrame(tdrstyleCheckBox, new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
+    controlFrameCheckboxes->AddFrame(statsCheckBox,    new TGLayoutHints(kLHintsLeft | kLHintsExpandX, 5, 5, 3, 4));
 
         // ------- Output Buttons
     TGVerticalFrame* outputControlFrameButtons = new TGVerticalFrame(controlFrame, 200, 40);
@@ -435,35 +436,22 @@ void MyMainFrame::PreviewSelection() {
     }
 }
 
-void MyMainFrame::Superimpose() {
-    if(selection.size() == 0) {
-        return;
-    }
-
-    resultCanvas = new TCanvas("Superimpose Canvas", "", 800, 400);
-    resultCanvas->cd();
-
-    // never work on the originals!
-    vector<TH1*> copies;
-    for(auto& elem : selection){
-        copies.push_back((TH1*)elem.second.GetObj()->Clone());
-    }
-
+// statboxes : OUT param
+void MyMainFrame::CalcSuperimpose(vector<TH1*>& plots, vector<TPaveStats*>& statboxes) {
     // collect the statboxes
-    vector<TPaveStats*> statboxes;
     TPaveStats* tstat;
     double X1, Y1, X2, Y2;
 
     TCanvas* tmpCanvas = new TCanvas("a Canvas", "", 800, 400);
     tmpCanvas->cd();
 
-    for(int i=0; i<copies.size(); i++) {
+    for(int i=0; i<plots.size(); i++) {
 
-        copies[i]->SetLineColor(kRed);
-        copies[i]->Draw();
+        plots[i]->SetLineColor(kRed);
+        plots[i]->Draw();
         gPad->Update();
 
-        tstat = (TPaveStats*) copies[i]->FindObject("stats");
+        tstat = (TPaveStats*) plots[i]->FindObject("stats");
 
         if(i!=0){
             tstat->SetX1NDC(X1);
@@ -481,31 +469,35 @@ void MyMainFrame::Superimpose() {
     }
     delete tmpCanvas;
 
+}
 
-    // draw all the things
+void MyMainFrame::SetCheckboxOptions(TH1* elem) {
+    if(xRangeCheckbox->IsOn()) {
+        elem->SetAxisRange(xminNumbertextbox->GetNumber(), xmaxNumbertextbox->GetNumber(),"X");
+    }
+
+    if(yRangeCheckbox->IsOn()) {
+        elem->SetAxisRange(yminNumbertextbox->GetNumber(), ymaxNumbertextbox->GetNumber(),"Y");
+    }
+
+    if(renameCheckbox->IsOn()) {
+        string tmp = renameTextbox->GetText();
+        elem->SetTitle(tmp.c_str());
+    }
+
+    elem->SetStats(statsCheckBox->IsOn());
+}
+
+void MyMainFrame::DrawPlots(vector<TH1*>& plots, vector<TPaveStats*>& statboxes, string option="") {
+
     resultCanvas->cd();
     Int_t colors[7] = {4, 8, 2, 1, 7, 33, 40}; //FIXME only supporting 7 colors...
 
     Int_t idx = 0;
-    for(auto& elem : copies) {
+    for(auto& elem : plots) {
         elem->SetLineColor(colors[idx]);
-
-        if(xRangeCheckbox->IsOn()) {
-            elem->SetAxisRange(xminNumbertextbox->GetNumber(), xmaxNumbertextbox->GetNumber(),"X");
-        }
-
-        if(yRangeCheckbox->IsOn()) {
-            elem->SetAxisRange(yminNumbertextbox->GetNumber(), ymaxNumbertextbox->GetNumber(),"Y");
-        }
-
-        if(renameCheckbox->IsOn()) {
-            string tmp = renameTextbox->GetText();
-            elem->SetTitle(tmp.c_str());
-        }
-
-        elem->SetStats(statsCheckBox->IsOn());
-
-        elem->Draw("same");
+        SetCheckboxOptions(elem);
+        elem->Draw(option.c_str());
         idx++;
     }
 
@@ -514,15 +506,34 @@ void MyMainFrame::Superimpose() {
         for(auto& elem : statboxes) {
             elem->SetTextColor(colors[idx]);
             elem->SetLineColor(colors[idx]);
-            elem->Draw("same");
+            elem->Draw(option.c_str());
 
             idx++;
         }
     }
 }
 
-void MyMainFrame::MergeSelection() {
+void MyMainFrame::Superimpose() {
+    if(selection.size() == 0) {
+        return;
+    }
 
+    resultCanvas = new TCanvas("Superimpose Canvas", "", 800, 400);
+    resultCanvas->cd();
+
+    // never work on the originals!
+    vector<TH1*> copies;
+    for(auto& elem : selection){
+        copies.push_back((TH1*)elem.second.GetObj()->Clone());
+    }
+
+    vector<TPaveStats*> statboxes; // out param
+
+    CalcSuperimpose(copies, statboxes);
+    DrawPlots(copies, statboxes, "same");
+}
+
+void MyMainFrame::MergeSelection() {
     if(selection.size() == 0) {
         return;
     }
@@ -537,25 +548,12 @@ void MyMainFrame::MergeSelection() {
     }
 
     // set options
-
     for(Int_t idx=1; idx<copies.size(); ++idx) {
         copies[0]->Add(copies[idx]);
     }
 
-    if(xRangeCheckbox->IsOn()) {
-        copies[0]->SetAxisRange(xminNumbertextbox->GetNumber(), xmaxNumbertextbox->GetNumber(),"X");
-    }
+    SetCheckboxOptions(copies[0]);
 
-    if(yRangeCheckbox->IsOn()) {
-        copies[0]->SetAxisRange(yminNumbertextbox->GetNumber(), ymaxNumbertextbox->GetNumber(),"Y");
-    }
-
-    if(renameCheckbox->IsOn()) {
-        string tmp = renameTextbox->GetText();
-        copies[0]->SetTitle(tmp.c_str());
-    }
-
-    copies[0]->SetStats(statsCheckBox->IsOn());
     copies[0]->Draw();
 }
 
